@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 import torch
 
-from kaf_profiti.experiments.datasets import create_protocol_datasets
+from kaf_profiti.experiments.datasets import create_protocol_datasets, resolve_data_root
 from kaf_profiti.experiments.masks import MaskedWindowDataset, generate_or_load_masks
 from kaf_profiti.experiments.registry import create_model, get_model_spec, list_model_specs
 from kaf_profiti.experiments.tables import build_tables
@@ -19,6 +19,26 @@ DATA_ROOT = PROJECT_ROOT / "dataset"
 def _require_dataset(dataset_dir: Path):
     if not dataset_dir.exists():
         pytest.skip(f"本地小规模数据不存在，跳过需要真实数据的实验框架测试: {dataset_dir}")
+
+
+def test_resolve_data_root_falls_back_to_project_root_when_running_from_code_dir(monkeypatch):
+    _require_dataset(DATA_ROOT / "CMAPSSData")
+    monkeypatch.chdir(PROJECT_ROOT / "code")
+
+    assert resolve_data_root("dataset") == DATA_ROOT
+
+
+def test_cmapss_protocol_reports_required_files_when_data_is_missing(tmp_path):
+    with pytest.raises(FileNotFoundError, match="C-MAPSS 数据文件缺失"):
+        create_protocol_datasets(
+            "cmapss_fd001",
+            tmp_path,
+            seed=2026,
+            history_len=12,
+            pred_len=3,
+            stride=120,
+            async_mode="none",
+        )
 
 
 def test_registry_enables_only_kaf_profiti_joint():

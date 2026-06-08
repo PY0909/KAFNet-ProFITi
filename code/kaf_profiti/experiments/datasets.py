@@ -41,6 +41,17 @@ class ProtocolDatasets:
     risk_upper_limits: torch.Tensor
 
 
+def resolve_data_root(data_root) -> Path:
+    root = Path(data_root)
+    if root.is_absolute() or root.exists():
+        return root
+    project_root = Path(__file__).resolve().parents[3]
+    project_relative = project_root / root
+    if project_relative.exists():
+        return project_relative
+    return root
+
+
 def create_protocol_datasets(
     dataset: str,
     data_root,
@@ -50,7 +61,7 @@ def create_protocol_datasets(
     stride: int,
     async_mode: str = "none",
 ) -> ProtocolDatasets:
-    data_root = Path(data_root)
+    data_root = resolve_data_root(data_root)
     if dataset == "metropt3":
         return _create_metropt(data_root, seed, history_len, pred_len, stride)
     if dataset.startswith("cmapss_fd"):
@@ -91,6 +102,20 @@ def _threshold_info(lower: torch.Tensor, upper: torch.Tensor):
 
 def _create_cmapss(data_root: Path, subset: str, seed: int, history_len: int, pred_len: int, stride: int):
     data_dir = data_root / "CMAPSSData"
+    required_files = [
+        data_dir / f"train_{subset}.txt",
+        data_dir / f"test_{subset}.txt",
+        data_dir / f"RUL_{subset}.txt",
+    ]
+    missing = [path for path in required_files if not path.exists()]
+    if missing:
+        required = "\n".join(f"- {path}" for path in required_files)
+        raise FileNotFoundError(
+            "C-MAPSS 数据文件缺失。请确认在仓库根目录运行，"
+            "或通过 --data-root 指向包含 CMAPSSData 的数据根目录。\n"
+            f"当前数据根目录: {data_root}\n"
+            f"需要以下文件:\n{required}"
+        )
     train_frame = load_cmapss_frame(data_dir, subset, "train")
     units = sorted(int(unit) for unit in train_frame["unit"].unique())
     permutation = torch.randperm(len(units), generator=torch.Generator().manual_seed(seed)).tolist()
