@@ -1,0 +1,40 @@
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# Python 缓存和测试缓存
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# 虚拟环境和本地密钥
+.venv/
+venv/
+env/
+*.env
+.env*
+
+# 原始数据集和大型下载压缩包
+dataset/
+*.zip
+*.tar
+*.tar.gz
+*.7z
+
+# 大型实验产物
+code/results/checkpoints/
+code/results/predictions/
+*.pt
+*.pth
+*.ckpt
+*.npy
+
+# 生成的二进制 mask 可由配置和随机种子再生成
+code/results/masks/*.npz
+
+# 本地临时文件
+tmp/
+temp/
+.cache/
