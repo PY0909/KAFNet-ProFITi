@@ -31,3 +31,31 @@ data-manifests/            数据来源、划分、下载与上传策略
 - 仓库治理：`docs/repository-governance.md`
 - 开题可行性设计：`docs/superpowers/specs/2026-06-08-opening-feasibility-design.md`
 - 执行计划：`docs/superpowers/plans/2026-06-08-opening-stable-execution.md`
+
+## 一键实验
+
+默认运行 C-MAPSS FD001 和 MetroPT-3 上的 4 个已实现模型、3 个 seed：
+
+```bash
+conda activate kaf_profiti
+bash scripts/run_all_experiments.sh
+```
+
+默认配置为全量 batch：`--max-train-batches 0 --max-eval-batches 0`。如果要先冒烟检查：
+
+```bash
+bash scripts/run_all_experiments.sh \
+  --dry-run
+```
+
+CPU 服务器：
+
+```bash
+DEVICE=cpu bash scripts/run_all_experiments.sh
+```
+
+扩展到 C-MAPSS FD001-FD004：
+
+```bash
+bash scripts/run_all_experiments.sh --profile cmapss_all
+```
