@@ -1,3 +1,5 @@
+import gzip
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -35,6 +37,7 @@ METROPT_FAULT_WINDOWS = [
     ("2020-07-15 14:30:00", "2020-07-15 19:00:00"),
 ]
 CSV_NAME = "MetroPT3(AirCompressor).csv"
+CSV_GZ_NAME = f"{CSV_NAME}.gz"
 _METROPT_FRAME_CACHE = {}
 
 
@@ -55,7 +58,14 @@ def load_metropt_frame(data_dir: Path) -> pd.DataFrame:
     data_dir = Path(data_dir)
     csv_path = data_dir / CSV_NAME
     if not csv_path.exists():
-        raise FileNotFoundError(csv_path)
+        gz_path = data_dir / CSV_GZ_NAME
+        if gz_path.exists():
+            with gzip.open(gz_path, "rb") as src, csv_path.open("wb") as dst:
+                shutil.copyfileobj(src, dst)
+        else:
+            raise FileNotFoundError(
+                f"MetroPT-3 数据文件缺失: {csv_path} 或 {gz_path}"
+            )
     cache_key = str(csv_path.resolve())
     if cache_key in _METROPT_FRAME_CACHE:
         return _METROPT_FRAME_CACHE[cache_key].copy()

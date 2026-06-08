@@ -21,10 +21,13 @@ dataset/**
 !dataset/
 !dataset/README.md
 !dataset/CMAPSSData/
-dataset/CMAPSSData/**
+!dataset/CMAPSSData/*.txt
+!dataset/CMAPSSData/*.pdf
 !dataset/CMAPSSData/README.md
 !dataset/metropt+3+dataset/
 dataset/metropt+3+dataset/**
+!dataset/metropt+3+dataset/*.pdf
+!dataset/metropt+3+dataset/*.csv.gz
 !dataset/metropt+3+dataset/README.md
 !dataset/dataverse_files/
 dataset/dataverse_files/**

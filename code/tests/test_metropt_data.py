@@ -1,5 +1,8 @@
 from pathlib import Path
 
+import gzip
+
+import pandas as pd
 import pytest
 import torch
 from torch.utils.data import DataLoader
@@ -9,6 +12,7 @@ from kaf_profiti.industrial.metropt import (
     METROPT_CONTEXT_COLUMNS,
     METROPT_FAULT_WINDOWS,
     METROPT_SENSOR_COLUMNS,
+    CSV_NAME,
     MetroPTWindowDataset,
     MetroPTWindowSample,
     load_metropt_frame,
@@ -36,6 +40,28 @@ def test_load_metropt_frame_matches_csv_facts():
     assert len(METROPT_SENSOR_COLUMNS) == 15
     assert METROPT_CONTEXT_COLUMNS == ["COMP", "DV_eletric", "MPG"]
     assert frame[METROPT_SENSOR_COLUMNS].isna().sum().sum() == 0
+
+
+def test_load_metropt_frame_restores_csv_from_gzip(tmp_path):
+    data_dir = tmp_path / "metropt+3+dataset"
+    data_dir.mkdir()
+    frame = pd.DataFrame(
+        [
+            {
+                "timestamp": "2020-02-01 00:00:00",
+                **{column: 0.0 for column in METROPT_SENSOR_COLUMNS},
+            }
+        ]
+    )
+    csv_bytes = frame.to_csv().encode("utf-8")
+    with gzip.open(data_dir / f"{CSV_NAME}.gz", "wb") as handle:
+        handle.write(csv_bytes)
+
+    loaded = load_metropt_frame(data_dir)
+
+    assert (data_dir / CSV_NAME).exists()
+    assert loaded.shape[0] == 1
+    assert set(METROPT_SENSOR_COLUMNS).issubset(loaded.columns)
 
 
 def test_metropt_fault_windows_label_known_ranges():

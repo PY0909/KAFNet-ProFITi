@@ -33,8 +33,10 @@ RUL_FD004.txt
 默认路径：
 
 ```text
-dataset/metropt+3+dataset/MetroPT3(AirCompressor).csv
+dataset/metropt+3+dataset/MetroPT3(AirCompressor).csv.gz
 ```
+
+代码第一次读取 MetroPT-3 时会自动解压得到 `MetroPT3(AirCompressor).csv`。
 
 ## TEP
 
