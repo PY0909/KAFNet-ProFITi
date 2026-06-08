@@ -24,6 +24,7 @@ dataset/
 *.7z
 
 # 大型实验产物
+code/outputs/
 code/results/checkpoints/
 code/results/predictions/
 *.pt
@@ -38,3 +39,7 @@ code/results/masks/*.npz
 tmp/
 temp/
 .cache/
+
+# 本地工具索引和编辑器状态
+.codegraph/
+.cursor/
