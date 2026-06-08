@@ -16,8 +16,19 @@ env/
 *.env
 .env*
 
-# 原始数据集和大型下载压缩包
-dataset/
+# 原始数据集和大型下载压缩包：保留目录说明，忽略真实数据文件
+dataset/**
+!dataset/
+!dataset/README.md
+!dataset/CMAPSSData/
+dataset/CMAPSSData/**
+!dataset/CMAPSSData/README.md
+!dataset/metropt+3+dataset/
+dataset/metropt+3+dataset/**
+!dataset/metropt+3+dataset/README.md
+!dataset/dataverse_files/
+dataset/dataverse_files/**
+!dataset/dataverse_files/README.md
 *.zip
 *.tar
 *.tar.gz

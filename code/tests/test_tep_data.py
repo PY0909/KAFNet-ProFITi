@@ -21,8 +21,14 @@ DATA_DIR = DATA_ROOT / "dataverse_files"
 
 
 def _require_tep_data():
-    if not DATA_DIR.exists():
-        pytest.skip(f"TEP 数据目录不存在: {DATA_DIR}")
+    required = [
+        DATA_DIR / "TEP_FaultFree_Training.RData",
+        DATA_DIR / "TEP_FaultFree_Testing.RData",
+    ]
+    missing = [path for path in required if not path.exists()]
+    if missing:
+        message = "\n".join(str(path) for path in missing)
+        pytest.skip(f"TEP 原始数据文件不存在，跳过 TEP 数据测试:\n{message}")
 
 
 def test_inspect_tep_fault_free_training_rdata_facts():
