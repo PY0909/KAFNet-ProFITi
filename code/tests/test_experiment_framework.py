@@ -6,7 +6,11 @@ import pytest
 import torch
 
 from kaf_profiti.experiments.datasets import create_protocol_datasets, resolve_data_root
-from kaf_profiti.experiments.masks import MaskedWindowDataset, generate_or_load_masks
+from kaf_profiti.experiments.masks import (
+    MaskedWindowDataset,
+    generate_or_load_masks,
+    generate_or_load_split_masks,
+)
 from kaf_profiti.experiments.registry import create_model, get_model_spec, list_model_specs
 from kaf_profiti.experiments.tables import build_tables
 from run_experiment import ExperimentConfig, run_experiment
@@ -144,6 +148,47 @@ def test_mask_npz_roundtrip_and_dataset_wrapper(tmp_path):
     assert np.array_equal(masks_a, masks_b)
     assert torch.equal(sample.M_obs, torch.tensor(masks_a[0], dtype=torch.float32))
     assert torch.all(sample.X_obs[sample.M_obs == 0] == 0)
+
+
+def test_split_mask_regenerates_empty_cache_file(tmp_path):
+    mask_path = tmp_path / "cmapss_fd001_missing_0.3_seed2028.npz"
+    mask_path.touch()
+
+    masks = generate_or_load_split_masks(
+        mask_path,
+        {
+            "train": (2, 4, 3),
+            "valid": (1, 4, 3),
+            "test": (1, 4, 3),
+        },
+        missing_rate=0.3,
+        seed=2028,
+        mode="mixed",
+    )
+
+    assert mask_path.stat().st_size > 0
+    assert masks["train"].shape == (2, 4, 3)
+    assert masks["train"].dtype == np.uint8
+    loaded = np.load(mask_path)
+    assert loaded["valid"].shape == (1, 4, 3)
+
+
+def test_mask_regenerates_cache_with_wrong_shape(tmp_path):
+    mask_path = tmp_path / "mask.npz"
+    np.savez_compressed(mask_path, mask=np.ones((1, 2, 3), dtype=np.uint8))
+
+    masks = generate_or_load_masks(
+        mask_path,
+        num_windows=2,
+        history_len=4,
+        num_sensors=3,
+        missing_rate=0.3,
+        seed=2026,
+        mode="mixed",
+    )
+
+    assert masks.shape == (2, 4, 3)
+    assert np.load(mask_path)["mask"].shape == (2, 4, 3)
 
 
 def test_run_experiment_writes_unified_outputs(tmp_path):
