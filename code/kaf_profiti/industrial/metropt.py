@@ -36,6 +36,7 @@ METROPT_FAULT_WINDOWS = [
     ("2020-06-05 10:00:00", "2020-06-07 14:30:00"),
     ("2020-07-15 14:30:00", "2020-07-15 19:00:00"),
 ]
+METROPT_RISK_LABEL_MODES = {"fault_window", "pre_fault_1h", "pre_fault_6h", "pre_fault_24h"}
 CSV_NAME = "MetroPT3(AirCompressor).csv"
 CSV_GZ_NAME = f"{CSV_NAME}.gz"
 _METROPT_FRAME_CACHE = {}
@@ -76,11 +77,20 @@ def load_metropt_frame(data_dir: Path) -> pd.DataFrame:
     if missing:
         raise ValueError(f"MetroPT CSV missing sensor columns: {missing}")
     frame["fault_label"] = 0
+    for hours in (1, 6, 24):
+        frame[f"pre_fault_{hours}h"] = 0
     for start, end in METROPT_FAULT_WINDOWS:
+        start_ts = pd.Timestamp(start)
+        end_ts = pd.Timestamp(end)
         mask = (frame["timestamp"] >= pd.Timestamp(start)) & (
             frame["timestamp"] <= pd.Timestamp(end)
         )
         frame.loc[mask, "fault_label"] = 1
+        for hours in (1, 6, 24):
+            pre_mask = (frame["timestamp"] >= start_ts - pd.Timedelta(hours=hours)) & (
+                frame["timestamp"] < start_ts
+            )
+            frame.loc[pre_mask, f"pre_fault_{hours}h"] = 1
     frame["relative_time"] = (
         frame["timestamp"] - frame["timestamp"].iloc[0]
     ).dt.total_seconds()
@@ -130,6 +140,7 @@ class MetroPTWindowDataset(Dataset):
         context_mode: str = "mean",
         train_ratio: float = 0.7,
         valid_ratio: float = 0.15,
+        risk_label_mode: str = "pre_fault_6h",
     ):
         self.data_dir = Path(data_dir)
         self.split = split
@@ -142,6 +153,7 @@ class MetroPTWindowDataset(Dataset):
         self.context_mode = context_mode
         self.train_ratio = float(train_ratio)
         self.valid_ratio = float(valid_ratio)
+        self.risk_label_mode = risk_label_mode
 
         if self.history_len <= 0 or self.pred_len <= 0:
             raise ValueError("history_len and pred_len must be positive")
@@ -149,6 +161,10 @@ class MetroPTWindowDataset(Dataset):
             raise ValueError("stride must be positive")
         if context_mode not in {"mean", "last"}:
             raise ValueError("context_mode must be 'mean' or 'last'")
+        if risk_label_mode not in METROPT_RISK_LABEL_MODES:
+            raise ValueError(
+                f"risk_label_mode must be one of {sorted(METROPT_RISK_LABEL_MODES)}"
+            )
         if not 0 < train_ratio < 1:
             raise ValueError("train_ratio must be between 0 and 1")
         if not 0 <= valid_ratio < 1 or train_ratio + valid_ratio >= 1:
@@ -197,7 +213,7 @@ class MetroPTWindowDataset(Dataset):
         mask_seed = self.seed + (self.global_start + start) * 1009
         M_obs = self.masker((self.history_len, len(METROPT_SENSOR_COLUMNS)), mask_seed)
         X_obs = sensors_hist * M_obs
-        future_fault = float(fut["fault_label"].max())
+        future_fault = self._risk_label_for_future(fut)
 
         return MetroPTWindowSample(
             X_obs=X_obs,
@@ -213,4 +229,14 @@ class MetroPTWindowDataset(Dataset):
             context=context,
             rul=future_fault,
             unit_id=0,
+        )
+
+    def _risk_label_for_future(self, future_frame: pd.DataFrame) -> float:
+        if self.risk_label_mode == "fault_window":
+            return float(future_frame["fault_label"].max())
+        return float(
+            (
+                future_frame[self.risk_label_mode].astype(int)
+                | future_frame["fault_label"].astype(int)
+            ).max()
         )

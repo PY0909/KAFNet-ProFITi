@@ -14,6 +14,10 @@ ENABLED_ABLATION_MODELS = [
     "kaf_profiti_joint_no_context",
     "kaf_profiti_joint",
 ]
+ENABLED_BASELINE_MODELS = [
+    "tcn_gaussian",
+    "gru_d",
+]
 MAIN_DATASETS = ["cmapss_fd001", "metropt3"]
 CMAPSS_ALL_DATASETS = ["cmapss_fd001", "cmapss_fd002", "cmapss_fd003", "cmapss_fd004"]
 
@@ -32,8 +36,10 @@ def _split_csv(value: str, cast=str) -> List[object]:
 
 
 def default_models_for_group(group: str) -> List[str]:
-    if group in {"ablation", "all"}:
+    if group == "ablation":
         return list(ENABLED_ABLATION_MODELS)
+    if group == "all":
+        return list(ENABLED_BASELINE_MODELS) + list(ENABLED_ABLATION_MODELS)
     if group == "final":
         return ["kaf_profiti_joint"]
     raise ValueError(f"Unknown model group: {group}")
@@ -112,6 +118,7 @@ def command_for_job(
     max_eval_batches: int,
     nsamples: int,
     device: str,
+    risk_label_mode: str,
 ) -> List[str]:
     return [
         python_executable,
@@ -146,6 +153,8 @@ def command_for_job(
         str(nsamples),
         "--device",
         device,
+        "--risk-label-mode",
+        risk_label_mode,
     ]
 
 
@@ -177,6 +186,11 @@ def parse_args():
     parser.add_argument("--max-eval-batches", type=int, default=0)
     parser.add_argument("--nsamples", type=int, default=20)
     parser.add_argument("--device", default="cuda")
+    parser.add_argument(
+        "--risk-label-mode",
+        default="pre_fault_6h",
+        choices=["fault_window", "pre_fault_1h", "pre_fault_6h", "pre_fault_24h"],
+    )
     parser.add_argument("--python", default=sys.executable)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--no-skip-completed", action="store_true")
@@ -232,6 +246,7 @@ def main():
             max_eval_batches=args.max_eval_batches,
             nsamples=args.nsamples,
             device=args.device,
+            risk_label_mode=args.risk_label_mode,
         )
         if not args.no_skip_completed and should_skip_job(job, output_dir):
             skipped += 1

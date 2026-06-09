@@ -19,11 +19,12 @@ from kaf_profiti.experiments.metrics import (
     expected_calibration_error,
     interval_metrics,
     point_metrics,
+    risk_score_diagnostics,
     safe_binary_metrics,
-    threshold_risk_score,
 )
 from kaf_profiti.experiments.registry import create_model, get_model_spec
 from kaf_profiti.industrial.batch import IndustrialCollator
+from kaf_profiti.industrial.risk import threshold_exceedance_risk_score
 
 
 @dataclass
@@ -55,6 +56,7 @@ class ExperimentConfig:
     flow_layers: int = 2
     preconv_dim: int = 8
     lambda_point: float = 0.1
+    risk_label_mode: str = "pre_fault_6h"
 
 
 def _write_json(path: Path, payload: Dict[str, object]) -> None:
@@ -98,19 +100,43 @@ def _risk_labels(dataset: str, batch, risk_threshold: float):
     return batch.rul.float().clamp(0, 1)
 
 
+def _effective_risk_label_mode(config: ExperimentConfig) -> str:
+    if config.dataset.startswith("cmapss"):
+        return "rul_threshold"
+    if config.dataset == "metropt3":
+        return config.risk_label_mode
+    return "dataset_binary_label"
+
+
 def _distribution_metrics(model, batch, nsamples: int):
     hidden = model.distribution(batch)
     if hasattr(model, "flow_head"):
         nll = model.flow_head.nll(batch.y_flat, hidden, batch.mq_flat).mean()
         samples = model.flow_head.sample(hidden, batch.mq_flat, nsamples=nsamples)
         crps = model.flow_head.crps(batch.y_flat, samples, batch.mq_flat)
-        return nll, samples, crps
+        diagnostics = model.flow_head.diagnostics(batch.y_flat, hidden, batch.mq_flat)
+        return nll, samples, crps, diagnostics
     if hasattr(model, "head"):
         nll = model.head.nll(batch.y_flat, hidden, batch.mq_flat).mean()
         samples = model.head.sample(hidden, batch.mq_flat, nsamples=nsamples)
         crps = crps_from_samples(batch.y_flat, samples, batch.mq_flat)
-        return nll, samples, crps
+        diagnostics = model.head.diagnostics(batch.y_flat, hidden, batch.mq_flat)
+        return nll, samples, crps, diagnostics
     raise TypeError(f"Unsupported model type for evaluation: {type(model).__name__}")
+
+
+def _accumulate_diagnostics(
+    totals: Dict[str, float],
+    flags: Dict[str, bool],
+    diagnostics: Dict[str, object],
+) -> None:
+    for key, value in diagnostics.items():
+        if value is None:
+            continue
+        if isinstance(value, bool):
+            flags[key] = flags.get(key, True) and value
+        elif isinstance(value, (int, float)):
+            totals[key] = totals.get(key, 0.0) + float(value)
 
 
 def _evaluate(
@@ -128,6 +154,8 @@ def _evaluate(
     samples_out: List[np.ndarray] = []
     risks: List[np.ndarray] = []
     labels: List[np.ndarray] = []
+    diagnostic_totals: Dict[str, float] = {}
+    diagnostic_flags: Dict[str, bool] = {}
     start = time.perf_counter()
     model.eval()
     with torch.no_grad():
@@ -135,13 +163,13 @@ def _evaluate(
             if config.max_eval_batches and idx >= config.max_eval_batches:
                 break
             batch = batch.to(device)
-            nll, samples, crps_tensor = _distribution_metrics(model, batch, config.nsamples)
+            nll, samples, crps_tensor, diagnostics = _distribution_metrics(model, batch, config.nsamples)
             mean = samples.mean(dim=1)
             mae, rmse = point_metrics(batch.y_flat, mean, batch.mq_flat)
             picp, mpiw = interval_metrics(batch.y_flat, samples, batch.mq_flat)
             crps = float(crps_tensor.cpu())
             samples_4d = samples.reshape(samples.shape[0], config.nsamples, config.pred_len, num_sensors)
-            risk = threshold_risk_score(
+            risk = threshold_exceedance_risk_score(
                 samples_4d,
                 risk_upper_limits,
                 risk_lower_limits,
@@ -157,15 +185,19 @@ def _evaluate(
             samples_out.append(samples.cpu().numpy())
             risks.append(risk.cpu().numpy())
             labels.append(label.cpu().numpy())
+            _accumulate_diagnostics(diagnostic_totals, diagnostic_flags, diagnostics)
             count += 1
     elapsed = time.perf_counter() - start
     averaged = {key: value / max(count, 1) for key, value in totals.items()}
     risk_scores = np.concatenate(risks) if risks else np.array([])
     risk_labels = np.concatenate(labels) if labels else np.array([])
     averaged.update(safe_binary_metrics(risk_labels, risk_scores))
+    averaged.update(risk_score_diagnostics(risk_labels, risk_scores))
     averaged["ece"] = expected_calibration_error(risk_labels, risk_scores)
     averaged["lead_time"] = None
     averaged["infer_time_ms_per_batch"] = (elapsed / max(count, 1)) * 1000.0
+    averaged.update({key: value / max(count, 1) for key, value in diagnostic_totals.items()})
+    averaged.update(diagnostic_flags)
     return averaged, means, samples_out, risks
 
 
@@ -184,6 +216,7 @@ def run_experiment(config: ExperimentConfig) -> Dict[str, object]:
         pred_len=config.pred_len,
         stride=config.stride,
         async_mode="none",
+        risk_label_mode=config.risk_label_mode,
     )
     split_path = output_dir / "splits" / f"{config.dataset}_split_seed{config.seed}.json"
     _write_json(split_path, bundle.split_info)
@@ -277,6 +310,8 @@ def run_experiment(config: ExperimentConfig) -> Dict[str, object]:
         "horizon": config.pred_len,
         **completed_metrics_template(),
         **eval_metrics,
+        "risk_label_mode": _effective_risk_label_mode(config),
+        "risk_score_rule": "threshold_exceedance_fraction",
         "train_time_sec": train_time,
         "num_params": sum(param.numel() for param in model.parameters()),
         "gpu_memory_mb": None,
@@ -317,6 +352,11 @@ def parse_args() -> ExperimentConfig:
     parser.add_argument("--flow-layers", type=int, default=2)
     parser.add_argument("--preconv-dim", type=int, default=8)
     parser.add_argument("--lambda-point", type=float, default=0.1)
+    parser.add_argument(
+        "--risk-label-mode",
+        default="pre_fault_6h",
+        choices=["fault_window", "pre_fault_1h", "pre_fault_6h", "pre_fault_24h"],
+    )
     return ExperimentConfig(**vars(parser.parse_args()))
 
 

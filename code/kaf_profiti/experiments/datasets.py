@@ -60,10 +60,11 @@ def create_protocol_datasets(
     pred_len: int,
     stride: int,
     async_mode: str = "none",
+    risk_label_mode: str = "pre_fault_6h",
 ) -> ProtocolDatasets:
     data_root = resolve_data_root(data_root)
     if dataset == "metropt3":
-        return _create_metropt(data_root, seed, history_len, pred_len, stride)
+        return _create_metropt(data_root, seed, history_len, pred_len, stride, risk_label_mode)
     if dataset.startswith("cmapss_fd"):
         subset = dataset.replace("cmapss_", "").upper()
         return _create_cmapss(data_root, subset, seed, history_len, pred_len, stride)
@@ -212,7 +213,14 @@ def _metro_clone(base: MetroPTWindowDataset, frame: pd.DataFrame, stats, global_
     return clone
 
 
-def _create_metropt(data_root: Path, seed: int, history_len: int, pred_len: int, stride: int):
+def _create_metropt(
+    data_root: Path,
+    seed: int,
+    history_len: int,
+    pred_len: int,
+    stride: int,
+    risk_label_mode: str,
+):
     data_dir = data_root / "metropt+3+dataset"
     full_frame = load_metropt_frame(data_dir)
     first_month = full_frame[
@@ -242,6 +250,7 @@ def _create_metropt(data_root: Path, seed: int, history_len: int, pred_len: int,
         stride=stride,
         async_mode="none",
         seed=seed,
+        risk_label_mode=risk_label_mode,
     )
     train = _metro_clone(base, train_frame, stats, train_start)
     valid = _metro_clone(base, valid_frame, stats, valid_start)
@@ -265,7 +274,8 @@ def _create_metropt(data_root: Path, seed: int, history_len: int, pred_len: int,
         "test_windows": len(test),
         "num_sensors": len(METROPT_SENSOR_COLUMNS),
         "context_dim": len(METROPT_CONTEXT_COLUMNS),
-        "label_rule": "fault report interval and pre-fault warning windows",
+        "label_rule": f"risk_label_mode={risk_label_mode}; positive if future window overlaps selected warning/fault label",
+        "risk_label_mode": risk_label_mode,
         **_threshold_info(risk_lower, risk_upper),
     }
     return ProtocolDatasets(

@@ -25,6 +25,18 @@ class GaussianHead(nn.Module):
         nll = 0.5 * (((y - mean).pow(2) / var) + log_var + math.log(2.0 * math.pi))
         return (nll * mask).sum(dim=-1) / mask.sum(dim=-1).clamp_min(1.0)
 
+    def diagnostics(self, y: Tensor, hidden_states: Tensor, mask: Tensor) -> dict:
+        mean, log_var = self.distribution_params(hidden_states, mask)
+        nll = self.nll(y, hidden_states, mask)
+        denom = mask.sum().detach().cpu().clamp_min(1.0)
+        return {
+            "y_flat_abs_mean": float((y.abs() * mask).sum().detach().cpu() / denom),
+            "hidden_abs_mean": float(hidden_states.abs().mean().detach().cpu()),
+            "nll_isfinite": bool(torch.isfinite(nll).all().detach().cpu()),
+            "gaussian_log_var_mean": float((log_var * mask).sum().detach().cpu() / denom),
+            "gaussian_mean_abs_mean": float((mean.abs() * mask).sum().detach().cpu() / denom),
+        }
+
     def sample(self, hidden_states: Tensor, mask: Tensor, nsamples: int = 100) -> Tensor:
         mean, log_var = self.distribution_params(hidden_states, mask)
         std = torch.exp(0.5 * log_var)

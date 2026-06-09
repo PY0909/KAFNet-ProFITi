@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader
 from kaf_profiti.industrial.batch import IndustrialCollator
 from kaf_profiti.industrial.cmapss import CMapssWindowDataset
 from kaf_profiti.industrial.batch import IndustrialBatch
+from kaf_profiti.models.gaussian_head import GaussianHead
 from kaf_profiti.models.kaf_profiti import KAFProFITi, KAFProFITiConfig
 from kaf_profiti.models.profiti_flow_head import ProFITiFlowHead
 from kaf_profiti.models.query_condition_adapter import QueryConditionAdapter
@@ -79,6 +80,29 @@ def test_profiti_flow_head_computes_finite_nll_and_samples():
     assert torch.isfinite(nll).all()
     assert samples.shape == (2, 5, 12)
     assert torch.isfinite(samples).all()
+
+
+def test_distribution_heads_report_nll_diagnostics():
+    y = torch.randn(2, 12)
+    hidden_states = torch.randn(2, 12, 16)
+    mask = torch.ones(2, 12)
+    gaussian = GaussianHead(hidden_dim=16)
+    flow = ProFITiFlowHead(
+        hidden_dim=16,
+        flow_layers=2,
+        marginal_training=False,
+        device=torch.device("cpu"),
+    )
+
+    gaussian_diag = gaussian.diagnostics(y, hidden_states, mask)
+    flow_diag = flow.diagnostics(y, hidden_states, mask)
+
+    assert gaussian_diag["nll_isfinite"] is True
+    assert gaussian_diag["gaussian_log_var_mean"] == pytest.approx(-1.0)
+    assert flow_diag["nll_isfinite"] is True
+    assert "flow_ldj_mean" in flow_diag
+    assert "flow_z_abs_mean" in flow_diag
+    assert "flow_nll_mean" in flow_diag
 
 
 def test_kaf_profiti_loss_backward_smoke():

@@ -1,6 +1,12 @@
 from dataclasses import dataclass
 from typing import Dict, List
 
+from kaf_profiti.models.baselines import (
+    GRUDGaussian,
+    GRUDGaussianConfig,
+    TCNGaussian,
+    TCNGaussianConfig,
+)
 from kaf_profiti.models.kaf_gaussian import KAFGaussian, KAFGaussianConfig
 from kaf_profiti.models.kaf_profiti import KAFProFITi, KAFProFITiConfig
 
@@ -14,11 +20,11 @@ class ModelSpec:
 
 
 _MODEL_SPECS: Dict[str, ModelSpec] = {
-    "tcn_gaussian": ModelSpec("tcn_gaussian", "TCN-Gaussian", "not_implemented", "baseline"),
+    "tcn_gaussian": ModelSpec("tcn_gaussian", "TCN-Gaussian", "enabled", "baseline"),
     "patchtst_gaussian": ModelSpec(
         "patchtst_gaussian", "PatchTST-Gaussian", "not_implemented", "baseline"
     ),
-    "gru_d": ModelSpec("gru_d", "GRU-D", "not_implemented", "baseline"),
+    "gru_d": ModelSpec("gru_d", "GRU-D", "enabled", "baseline"),
     "ode_rnn": ModelSpec("ode_rnn", "ODE-RNN", "not_implemented", "baseline"),
     "mtan": ModelSpec("mtan", "mTAN", "not_implemented", "baseline"),
     "tpatchgnn": ModelSpec("tpatchgnn", "tPatchGNN", "not_implemented", "baseline"),
@@ -74,6 +80,28 @@ def create_model(
     spec = get_model_spec(name)
     if spec.status != "enabled":
         raise NotImplementedError(f"Model {name} is registered as {spec.status}")
+    if name == "tcn_gaussian":
+        config = TCNGaussianConfig(
+            num_sensors=num_sensors,
+            context_dim=context_dim,
+            hidden_dim=hidden_dim,
+            te_dim=te_dim,
+            n_layers=n_layers,
+            lambda_point=lambda_point,
+            device=device,
+        )
+        return TCNGaussian(config)
+    if name == "gru_d":
+        config = GRUDGaussianConfig(
+            num_sensors=num_sensors,
+            context_dim=context_dim,
+            hidden_dim=hidden_dim,
+            te_dim=te_dim,
+            n_layers=n_layers,
+            lambda_point=lambda_point,
+            device=device,
+        )
+        return GRUDGaussian(config)
     if name == "kafnet_gaussian":
         config = KAFGaussianConfig(
             num_sensors=num_sensors,

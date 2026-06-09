@@ -33,7 +33,7 @@ def test_load_metropt_frame_matches_csv_facts():
     _require_metropt_data()
     frame = load_metropt_frame(DATA_DIR)
 
-    assert frame.shape == (1516948, 18)
+    assert frame.shape == (1516948, 21)
     assert frame["timestamp"].min().isoformat() == "2020-02-01T00:00:00"
     assert frame["timestamp"].max().isoformat() == "2020-09-01T03:59:50"
     assert frame["timestamp"].is_monotonic_increasing
@@ -62,6 +62,54 @@ def test_load_metropt_frame_restores_csv_from_gzip(tmp_path):
     assert (data_dir / CSV_NAME).exists()
     assert loaded.shape[0] == 1
     assert set(METROPT_SENSOR_COLUMNS).issubset(loaded.columns)
+
+
+def test_metropt_prefault_warning_columns_and_window_label(tmp_path):
+    data_dir = tmp_path / "metropt+3+dataset"
+    data_dir.mkdir()
+    rows = [
+        {"timestamp": "2020-04-17 17:59:00"},
+        {"timestamp": "2020-04-17 18:00:00"},
+        {"timestamp": "2020-04-18 00:00:00"},
+    ]
+    frame = pd.DataFrame(
+        [
+            {
+                **row,
+                **{column: float(index) for column in METROPT_SENSOR_COLUMNS},
+            }
+            for index, row in enumerate(rows)
+        ]
+    )
+    frame.to_csv(data_dir / CSV_NAME)
+
+    loaded = load_metropt_frame(data_dir)
+    fault_window = MetroPTWindowDataset(
+        data_dir,
+        split="all",
+        history_len=1,
+        pred_len=1,
+        stride=1,
+        async_mode="none",
+        normalize=False,
+        risk_label_mode="fault_window",
+    )
+    prefault_window = MetroPTWindowDataset(
+        data_dir,
+        split="all",
+        history_len=1,
+        pred_len=1,
+        stride=1,
+        async_mode="none",
+        normalize=False,
+        risk_label_mode="pre_fault_6h",
+    )
+
+    assert loaded.loc[0, "pre_fault_6h"] == 0
+    assert loaded.loc[1, "pre_fault_6h"] == 1
+    assert loaded.loc[1, "fault_label"] == 0
+    assert fault_window[0].rul == 0.0
+    assert prefault_window[0].rul == 1.0
 
 
 def test_metropt_fault_windows_label_known_ranges():

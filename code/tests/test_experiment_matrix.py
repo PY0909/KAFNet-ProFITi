@@ -38,6 +38,19 @@ def test_ablation_defaults_cover_main_datasets_models_and_three_seeds():
     assert {job.stride for job in jobs if job.dataset == "metropt3"} == {120}
 
 
+def test_all_model_group_includes_real_baselines_and_ablation_models():
+    models = default_models_for_group("all")
+
+    assert models == [
+        "tcn_gaussian",
+        "gru_d",
+        "kafnet_gaussian",
+        "kaf_profiti_marginal",
+        "kaf_profiti_joint_no_context",
+        "kaf_profiti_joint",
+    ]
+
+
 def test_command_for_job_uses_full_run_limits_and_dataset_arguments():
     job = Job(
         dataset="cmapss_fd001",
@@ -61,6 +74,7 @@ def test_command_for_job_uses_full_run_limits_and_dataset_arguments():
         max_eval_batches=0,
         nsamples=20,
         device="cuda",
+        risk_label_mode="pre_fault_6h",
     )
 
     assert command[:2] == ["/env/bin/python", "code/run_experiment.py"]
@@ -69,6 +83,7 @@ def test_command_for_job_uses_full_run_limits_and_dataset_arguments():
     assert command[command.index("--max-train-batches") + 1] == "0"
     assert command[command.index("--max-eval-batches") + 1] == "0"
     assert command[command.index("--device") + 1] == "cuda"
+    assert command[command.index("--risk-label-mode") + 1] == "pre_fault_6h"
 
 
 def test_should_skip_job_when_completed_metrics_exists(tmp_path):

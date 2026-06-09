@@ -164,6 +164,21 @@ class ProFITiFlowHead(nn.Module):
         joint_nll = gaussian_nll.sum(dim=-1) - ldj
         return joint_nll / mask.sum(dim=-1).clamp_min(1.0)
 
+    def diagnostics(self, y_flat: Tensor, hidden_states: Tensor, mask: Tensor) -> Dict[str, object]:
+        z, ldj = self.flow.forward(y_flat, hidden_states, mask)
+        gaussian_nll = 0.5 * (z.pow(2) + math.log(2.0 * math.pi)) * mask
+        nll = (gaussian_nll.sum(dim=-1) - ldj) / mask.sum(dim=-1).clamp_min(1.0)
+        denom = mask.sum().detach().cpu().clamp_min(1.0)
+        return {
+            "y_flat_abs_mean": float((y_flat.abs() * mask).sum().detach().cpu() / denom),
+            "hidden_abs_mean": float(hidden_states.abs().mean().detach().cpu()),
+            "nll_isfinite": bool(torch.isfinite(nll).all().detach().cpu()),
+            "flow_z_abs_mean": float((z.abs() * mask).sum().detach().cpu() / denom),
+            "flow_ldj_mean": float(ldj.mean().detach().cpu()),
+            "flow_gaussian_nll_mean": float(gaussian_nll.sum(dim=-1).mean().detach().cpu()),
+            "flow_nll_mean": float(nll.mean().detach().cpu()),
+        }
+
     def sample(self, hidden_states: Tensor, mask: Tensor, nsamples: int = 100) -> Tensor:
         batch_size, query_count, _ = hidden_states.shape
         z = torch.randn(batch_size, nsamples, query_count, device=hidden_states.device)

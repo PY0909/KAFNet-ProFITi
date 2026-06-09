@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from torch import Tensor
 
-from kaf_profiti.industrial.risk import threshold_risk_score
+from kaf_profiti.industrial.risk import threshold_exceedance_risk_score, threshold_risk_score
 
 try:
     from sklearn.metrics import average_precision_score, f1_score, roc_auc_score
@@ -23,6 +23,31 @@ def safe_binary_metrics(labels: np.ndarray, scores: np.ndarray, threshold: float
         "auroc": float(roc_auc_score(labels, scores)) if roc_auc_score else None,
         "auprc": float(average_precision_score(labels, scores)) if average_precision_score else None,
         "f1": float(f1_score(labels, pred)) if f1_score else None,
+    }
+
+
+def risk_score_diagnostics(labels: np.ndarray, scores: np.ndarray) -> Dict[str, object]:
+    labels = labels.astype(float)
+    scores = scores.astype(float)
+    if labels.size == 0:
+        return {
+            "label_positive_rate": None,
+            "label_unique_count": 0,
+            "risk_score_min": None,
+            "risk_score_max": None,
+            "risk_score_mean": None,
+            "risk_score_std": None,
+            "risk_score_is_constant": None,
+        }
+    score_std = float(scores.std()) if scores.size else None
+    return {
+        "label_positive_rate": float(labels.mean()),
+        "label_unique_count": int(np.unique(labels.astype(int)).size),
+        "risk_score_min": float(scores.min()) if scores.size else None,
+        "risk_score_max": float(scores.max()) if scores.size else None,
+        "risk_score_mean": float(scores.mean()) if scores.size else None,
+        "risk_score_std": score_std,
+        "risk_score_is_constant": bool(score_std is not None and score_std < 1e-12),
     }
 
 
@@ -89,4 +114,21 @@ def completed_metrics_template() -> Dict[str, object]:
         "infer_time_ms_per_batch": None,
         "num_params": None,
         "gpu_memory_mb": None,
+        "risk_label_mode": None,
+        "risk_score_rule": None,
+        "label_positive_rate": None,
+        "label_unique_count": None,
+        "risk_score_min": None,
+        "risk_score_max": None,
+        "risk_score_mean": None,
+        "risk_score_std": None,
+        "risk_score_is_constant": None,
+        "y_flat_abs_mean": None,
+        "hidden_abs_mean": None,
+        "nll_isfinite": None,
+        "gaussian_log_var_mean": None,
+        "flow_z_abs_mean": None,
+        "flow_ldj_mean": None,
+        "flow_gaussian_nll_mean": None,
+        "flow_nll_mean": None,
     }

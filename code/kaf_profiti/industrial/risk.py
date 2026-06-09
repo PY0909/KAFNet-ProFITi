@@ -40,6 +40,17 @@ def threshold_risk_score(samples: Tensor, upper_limits: Tensor, lower_limits: Te
     return any_crossed.mean(dim=1)
 
 
+def threshold_exceedance_risk_score(samples: Tensor, upper_limits: Tensor, lower_limits: Tensor) -> Tensor:
+    if samples.dim() != 4:
+        raise ValueError("samples must have shape (B, S, Lp, N)")
+    upper = upper_limits.to(samples.device).view(1, 1, 1, -1)
+    lower = lower_limits.to(samples.device).view(1, 1, 1, -1)
+    if upper.shape[-1] != samples.shape[-1] or lower.shape[-1] != samples.shape[-1]:
+        raise ValueError("threshold dimension must match sensor dimension")
+    crossed = (samples > upper) | (samples < lower)
+    return crossed.float().mean(dim=(1, 2, 3))
+
+
 def risk_from_samples(samples: Tensor, lower: Tensor, upper: Tensor) -> Dict[str, Tensor]:
     if samples.dim() != 4:
         raise ValueError("samples must have shape (B, S, Lp, N)")

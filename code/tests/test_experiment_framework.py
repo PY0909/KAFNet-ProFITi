@@ -45,14 +45,17 @@ def test_cmapss_protocol_reports_required_files_when_data_is_missing(tmp_path):
         )
 
 
-def test_registry_enables_only_kaf_profiti_joint():
+def test_registry_enables_real_baselines_and_kaf_variants():
     specs = {spec.name: spec for spec in list_model_specs()}
 
+    assert specs["tcn_gaussian"].status == "enabled"
+    assert specs["gru_d"].status == "enabled"
+    assert specs["kafnet_gaussian"].status == "enabled"
     assert specs["kaf_profiti_joint"].status == "enabled"
-    assert specs["tcn_gaussian"].status == "not_implemented"
+    assert specs["patchtst_gaussian"].status == "not_implemented"
     assert get_model_spec("kaf_profiti_joint").display_name == "KAFNet + ProFITi Joint Flow"
     with pytest.raises(NotImplementedError):
-        create_model("tcn_gaussian", num_sensors=15, context_dim=3, device="cpu")
+        create_model("patchtst_gaussian", num_sensors=15, context_dim=3, device="cpu")
 
 
 def test_protocol_splits_match_metropt_and_cmapss_rules():
@@ -229,6 +232,12 @@ def test_run_experiment_writes_unified_outputs(tmp_path):
     assert loaded["mae"] is not None
     assert loaded["rmse"] is not None
     assert loaded["picp"] is not None
+    assert loaded["risk_label_mode"] == "rul_threshold"
+    assert loaded["risk_score_rule"] == "threshold_exceedance_fraction"
+    assert loaded["label_unique_count"] is not None
+    assert loaded["risk_score_std"] is not None
+    assert loaded["nll_isfinite"] is True
+    assert loaded["y_flat_abs_mean"] is not None
 
 
 def test_build_tables_reads_metrics_and_marks_not_implemented(tmp_path):
@@ -254,6 +263,18 @@ def test_build_tables_reads_metrics_and_marks_not_implemented(tmp_path):
                 "f1": None,
                 "ece": None,
                 "lead_time": None,
+                "risk_label_mode": "pre_fault_6h",
+                "risk_score_rule": "threshold_exceedance_fraction",
+                "label_positive_rate": 0.25,
+                "label_unique_count": 2,
+                "risk_score_min": 0.1,
+                "risk_score_max": 0.4,
+                "risk_score_mean": 0.2,
+                "risk_score_std": 0.1,
+                "risk_score_is_constant": False,
+                "y_flat_abs_mean": 0.5,
+                "hidden_abs_mean": 0.2,
+                "nll_isfinite": True,
                 "train_time_sec": 1.0,
                 "infer_time_ms_per_batch": 2.0,
                 "num_params": 10,
@@ -267,12 +288,18 @@ def test_build_tables_reads_metrics_and_marks_not_implemented(tmp_path):
     build_tables(tmp_path)
 
     table2 = tmp_path / "tables" / "table2_main_forecasting.csv"
+    table3 = tmp_path / "tables" / "table3_risk_prediction.csv"
     table5 = tmp_path / "tables" / "table5_ablation.csv"
     assert table2.exists()
+    assert table3.exists()
     assert table5.exists()
     text = table2.read_text()
     assert "kaf_profiti_joint" in text
     assert "not_implemented" in text
+    risk_text = table3.read_text()
+    assert "risk_score_rule" in risk_text
+    assert "threshold_exceedance_fraction" in risk_text
+    assert "risk_score_std" in risk_text
 
 
 def test_build_tables_adds_mean_std_summary(tmp_path):

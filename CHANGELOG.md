@@ -2,6 +2,15 @@
 
 本文件记录论文与实验仓库层面的重要变更。
 
+## 2026-06-09
+
+- Fixed: 修复 MetroPT 风险标签协议，新增 `fault_window`、`pre_fault_1h`、`pre_fault_6h`、`pre_fault_24h` 可配置标签模式。
+- Fixed: 将风险评分从“任一传感器/任一预测步越界”改为“阈值越界比例”，降低多传感器场景下风险分数饱和为 1 的问题。
+- Added: 新增风险诊断与 NLL 诊断字段，包括标签正例率、风险分数范围/标准差、NLL 有限性、hidden/y 尺度和 flow log-det 诊断。
+- Added: 新增 `TCN-Gaussian` 与 `GRU-D` 两个真实强基线，并接入统一实验注册表、矩阵脚本和 metrics 输出。
+- Changed: `run_experiment_matrix.py --model-group all` 现在包含 `tcn_gaussian`、`gru_d` 和已有 KAF/KAF-ProFITi 消融模型。
+- Experiment: 完成本地小规模 smoke 验证，`metropt3 + kafnet_gaussian`、`cmapss_fd001 + tcn_gaussian`、`cmapss_fd001 + gru_d` 均可写出 metrics 与风险诊断表。
+
 ## 2026-06-08
 
 - 新增论文开题可行性设计。
