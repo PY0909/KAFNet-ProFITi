@@ -21,10 +21,17 @@
 每篇文献必须记录：
 
 ```text
-language,year,title,authors,venue,topic,url,used_in,verified_date
+sequence,language,year,title,authors,venue,source_type,source_level,topic,url,used_in,in_text_citation,citation_gbt_7714_2025,verified_date
 ```
 
 英文文献优先使用 DOI、出版社页、会议页或 arXiv。中文文献优先使用 CNKI、万方、维普、期刊官网或 DOI。无法确认来源真实性的条目不进入最终开题报告。
+
+## 本轮核验补充
+
+- 引用表按开题报告正文顺序重新编号，正文引用建议使用“作者等[序号]”或“两位作者[序号]”形式。
+- `citation_gbt_7714_2025` 列按顺序编码制 GB/T 7714 著录习惯整理，保留 `[J/OL]`、`[C/OL]`、`[EB/OL]` 和访问日期。
+- 985 高校硕博学位论文仅在存在稳定可核验论文详情页或原文链接时纳入。无法稳定打开的 CNKI/万方动态检索结果不写入最终引用表，避免把不可复核条目混入开题报告。
+- arXiv 条目只用于模型原文、最新方法或会议论文公开版本；若已有稳定会议/出版社页，优先记录会议/出版社页。
 
 ## 使用位置
 
