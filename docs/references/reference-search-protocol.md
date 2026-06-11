@@ -2,10 +2,10 @@
 
 ## 数量要求
 
-- 总数：40-45 篇核验文献。
-- 英文：至少 22 篇。
-- 中文：至少 12 篇。
-- 年份：优先 2022-2026。
+- 总数：精简为 20-25 篇核心核验文献。
+- 英文：优先保留顶会、顶刊和核心方法原文。
+- 中文：只保留与工业预测性维护、剩余寿命和智能诊断强相关的中文权威期刊或 985 高校学报文献。
+- 年份：优先 2022-2026，除非是不可替代的经典方法，否则不纳入。
 - 每篇必须有真实链接。
 
 ## 主题分组
@@ -14,7 +14,7 @@
 2. 异步、不规则、缺失多元时间序列建模。
 3. 概率预测、不确定性量化与校准。
 4. RUL、健康状态预测与风险评估。
-5. KAFNet、ProFITi、GraFITi、GRU-D、mTAN、ODE-RNN、TCN、PatchTST 等相关模型。
+5. KAFNet、KST ProbFlow、ProFITi、GraFITi、PatchTST、TimesNet、iTransformer、RAINDROP、NCDSSM、TACTiS、TACTiS-2、Conformal Prediction、TranAD、DCdetector 等相关模型。
 
 ## 核验规则
 
